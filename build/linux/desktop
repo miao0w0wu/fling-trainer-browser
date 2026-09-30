@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Name=My Product
+Comment=A fling-trainer-browser application
+# The Exec line includes %u to pass the URL to the application
+Exec=/usr/local/bin/fling-trainer-browser.exe %u
+Terminal=false
+Type=Application
+Icon=fling-trainer-browser.exe
+Categories=Utility;
+StartupWMClass=fling-trainer-browser.exe
+
+ 
