@@ -1,59 +1,61 @@
-# Welcome to Your New Wails3 Project!
+# FLiNG Trainer Browser
 
-Congratulations on generating your Wails3 application! This README will guide you through the next steps to get your project up and running.
+FLiNG Trainer Browser is a Wails 3 desktop application for searching, viewing,
+and downloading trainers from flingtrainer.com.
 
-## Getting Started
+## Development
 
-1. Navigate to your project directory in the terminal.
+Run from the project root:
 
-2. To run your application in development mode, use the following command:
+```powershell
+wails3 dev -config .\build\config.yml -port 9245
+```
 
-   ```
-   wails3 dev
-   ```
+Regenerate bindings after changing exported Go services:
 
-   This will start your application and enable hot-reloading for both frontend and backend changes.
+```powershell
+wails3 generate bindings -ts -i
+```
 
-3. To build your application for production, use:
+## Production build
 
-   ```
-   wails3 build
-   ```
+Build the Windows application with:
 
-   This will create a production-ready executable in the `build` directory.
+```powershell
+wails3 build -config .\build\config.yml
+```
 
-## Exploring Wails3 Features
+The executable is written to:
 
-Now that you have your project set up, it's time to explore the features that Wails3 offers:
+```text
+bin\fling-trainer-browser.exe
+```
 
-1. **Check out the examples**: The best way to learn is by example. Visit the `examples` directory in the `v3/examples` directory to see various sample applications.
+The frontend production bundle is embedded into the executable. The Vite
+configuration splits React, Ant Design, and Wails runtime dependencies into
+separate chunks.
 
-2. **Run an example**: To run any of the examples, navigate to the example's directory and use:
+Cross-platform builds can be requested with the target-specific Wails build
+options. Native signing and packaging requirements still apply:
 
-   ```
-   go run .
-   ```
+- Windows: unsigned binaries may trigger Microsoft Defender reputation warnings.
+  Code-sign the executable and distribute a checksum with releases.
+- macOS: an outside-App-Store build needs Developer ID signing and notarization
+  before Gatekeeper will open it without an override.
+- Linux: package the executable using the distribution format appropriate for
+  the target system.
 
-   Note: Some examples may be under development during the alpha phase.
+## Project structure
 
-3. **Explore the documentation**: Visit the [Wails3 documentation](https://v3.wails.io/) for in-depth guides and API references.
+- `backend/models`: Shared trainer data models.
+- `backend/scraper`: Search and detail-page scraping.
+- `backend/services`: Wails services and download handling.
+- `frontend/src`: React UI, Zustand state, and Wails event handling.
+- `frontend/bindings`: Generated TypeScript bindings.
+- `main.go`: Application entry point and service registration.
 
-4. **Join the community**: Have questions or want to share your progress? Join the [Wails Discord](https://discord.gg/JDdSxwjhGf) or visit the [Wails discussions on GitHub](https://github.com/wailsapp/wails/discussions).
+Downloaded archives are stored in:
 
-## Project Structure
-
-Take a moment to familiarize yourself with your project structure:
-
-- `frontend/`: Contains your frontend code (HTML, CSS, JavaScript/TypeScript)
-- `main.go`: The entry point of your Go backend
-- `app.go`: Define your application structure and methods here
-- `wails.json`: Configuration file for your Wails project
-
-## Next Steps
-
-1. Modify the frontend in the `frontend/` directory to create your desired UI.
-2. Add backend functionality in `main.go`.
-3. Use `wails3 dev` to see your changes in real-time.
-4. When ready, build your application with `wails3 build`.
-
-Happy coding with Wails3! If you encounter any issues or have questions, don't hesitate to consult the documentation or reach out to the Wails community.
+```text
+~/Downloads/FLiNG_Trainers/
+```
