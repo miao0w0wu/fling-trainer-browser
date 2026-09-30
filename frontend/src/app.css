@@ -44,6 +44,20 @@ body,
   width: min(560px, 100%);
 }
 
+.recent-searches {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  color: #667085;
+  font-size: 12px;
+}
+
+.recent-search-tag {
+  cursor: pointer;
+  margin-inline-end: 0;
+}
+
 .app-content {
   padding: 32px;
 }
@@ -120,6 +134,38 @@ body,
   margin-bottom: 24px;
 }
 
+.download-bar {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 10;
+  padding: 12px 32px;
+  background: rgba(255, 255, 255, 0.96);
+  border-top: 1px solid #d9e0ea;
+  box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(8px);
+}
+
+.download-bar-content {
+  display: flex;
+  max-width: 1100px;
+  margin: 0 auto;
+  align-items: center;
+  gap: 20px;
+}
+
+.download-bar-label {
+  display: flex;
+  min-width: 150px;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.download-bar .ant-progress {
+  flex: 1;
+}
+
 @media (max-width: 720px) {
   .app-header {
     align-items: stretch;
@@ -144,5 +190,15 @@ body,
   .detail-panel {
     min-height: 320px;
     padding: 16px;
+  }
+
+  .download-bar {
+    padding: 10px 16px;
+  }
+
+  .download-bar-content {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 6px;
   }
 }

@@ -3,6 +3,7 @@ package scraper
 import (
 	"errors"
 	"fmt"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -14,11 +15,15 @@ import (
 )
 
 const (
-	targetBaseURL   = "https://flingtrainer.com"
-	searchUserAgent = "FLiNG-Trainer-Browser/0.1 (+https://flingtrainer.com/)"
+	targetBaseURL = "https://flingtrainer.com"
 )
 
 var nonSlugCharacters = regexp.MustCompile(`[^a-z0-9]+`)
+var userAgents = []string{
+	"FLiNG-Trainer-Browser/0.1 (+https://flingtrainer.com/)",
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36",
+	"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/131 Safari/537.36",
+}
 
 // SearchAgent searches FLiNG using a direct trainer URL first and WordPress
 // search as a fallback.
@@ -28,7 +33,7 @@ type SearchAgent struct {
 
 // NewSearchAgent creates a search agent with the required request policy.
 func NewSearchAgent() *SearchAgent {
-	return &SearchAgent{userAgent: searchUserAgent}
+	return &SearchAgent{userAgent: randomUserAgent()}
 }
 
 // Search searches the direct trainer route and falls back to WordPress search
@@ -39,12 +44,27 @@ func (a *SearchAgent) Search(gameName string) ([]models.SearchResult, error) {
 		return nil, errors.New("game name cannot be empty")
 	}
 
-	directResults, directStatus, directErr := a.searchDirect(query)
+	var directResults []models.SearchResult
+	var directStatus int
+	var directErr error
+	for attempt := 0; attempt < 3; attempt++ {
+		directResults, directStatus, directErr = a.searchDirect(query)
+		if !shouldRetry(directStatus, directErr) {
+			break
+		}
+	}
 	if directErr == nil && directStatus != http.StatusNotFound && len(directResults) > 0 {
 		return directResults, nil
 	}
 
-	fallbackResults, fallbackErr := a.searchWordPress(query)
+	var fallbackResults []models.SearchResult
+	var fallbackErr error
+	for attempt := 0; attempt < 3; attempt++ {
+		fallbackResults, fallbackErr = a.searchWordPress(query)
+		if !shouldRetry(0, fallbackErr) {
+			break
+		}
+	}
 	if fallbackErr != nil {
 		if directErr != nil {
 			return nil, fmt.Errorf("direct search failed: %w; fallback search failed: %v", directErr, fallbackErr)
@@ -113,14 +133,15 @@ func (a *SearchAgent) searchWordPress(query string) ([]models.SearchResult, erro
 }
 
 func (a *SearchAgent) newCollector() *colly.Collector {
+	userAgent := randomUserAgent()
 	collector := colly.NewCollector(
-		colly.UserAgent(a.userAgent),
+		colly.UserAgent(userAgent),
 		colly.MaxDepth(1),
 		colly.ParseHTTPErrorResponse(),
 	)
 	collector.SetRequestTimeout(20 * time.Second)
 	collector.SetRedirectHandler(func(request *http.Request, _ []*http.Request) error {
-		request.Header.Set("User-Agent", a.userAgent)
+		request.Header.Set("User-Agent", userAgent)
 		return nil
 	})
 	if err := collector.Limit(&colly.LimitRule{
@@ -130,7 +151,7 @@ func (a *SearchAgent) newCollector() *colly.Collector {
 		panic(fmt.Sprintf("configure scraper rate limit: %v", err))
 	}
 	collector.OnRequest(func(request *colly.Request) {
-		request.Headers.Set("User-Agent", a.userAgent)
+		request.Headers.Set("User-Agent", userAgent)
 	})
 	return collector
 }
@@ -180,4 +201,19 @@ func appendUniqueResult(results []models.SearchResult, candidate models.SearchRe
 		}
 	}
 	return append(results, candidate)
+}
+
+func randomUserAgent() string {
+	return userAgents[rand.Intn(len(userAgents))]
+}
+
+func shouldRetry(statusCode int, err error) bool {
+	if statusCode == http.StatusNotFound {
+		return false
+	}
+	if statusCode == http.StatusForbidden || statusCode == http.StatusTooManyRequests ||
+		statusCode >= http.StatusInternalServerError {
+		return true
+	}
+	return err != nil
 }

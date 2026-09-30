@@ -8,12 +8,15 @@ import {
   Skeleton,
   Tag,
   Typography,
+  message,
 } from 'antd'
 import { useAppStore } from '../store/appStore'
 
 function DetailPanel() {
   const detail = useAppStore((state) => state.selectedDetail)
   const loading = useAppStore((state) => state.loading.detail)
+  const downloading = useAppStore((state) => state.loading.download)
+  const downloadTrainer = useAppStore((state) => state.downloadTrainer)
 
   if (loading) {
     return (
@@ -33,6 +36,14 @@ function DetailPanel() {
 
   const options = detail.options ?? []
   const images = detail.images ?? []
+  const handleDownload = async () => {
+    try {
+      const path = await downloadTrainer(detail.downloadUrl)
+      message.success(`下载完成：${path}`)
+    } catch {
+      message.error('下载失败，请稍后重试')
+    }
+  }
 
   return (
     <div className="detail-panel">
@@ -91,8 +102,10 @@ function DetailPanel() {
         block
         disabled={!detail.downloadUrl}
         icon={<DownloadOutlined />}
+        loading={downloading}
         size="large"
         type="primary"
+        onClick={() => void handleDownload()}
       >
         下载修改器
       </Button>

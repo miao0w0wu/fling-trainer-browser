@@ -1,5 +1,7 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 import {
+  DownloadTrainer,
   GetTrainerDetail,
   SearchTrainer,
 } from '../../bindings/changeme/backend/services/trainerservice'
@@ -18,6 +20,7 @@ interface DownloadProgressState {
 
 interface AppState {
   searchKeyword: string
+  recentSearches: string[]
   results: SearchResult[]
   selectedDetail: TrainerDetail | null
   loading: LoadingState
@@ -26,12 +29,14 @@ interface AppState {
   setSearchKeyword: (keyword: string) => void
   search: (keyword?: string) => Promise<void>
   loadDetail: (detailURL: string) => Promise<void>
+  downloadTrainer: (downloadURL: string) => Promise<string>
   setDownloadProgress: (progress: DownloadProgressState) => void
   clearError: () => void
 }
 
-export const useAppStore = create<AppState>((set, get) => ({
+export const useAppStore = create<AppState>()(persist((set, get) => ({
   searchKeyword: '',
+  recentSearches: [],
   results: [],
   selectedDetail: null,
   loading: {
@@ -60,7 +65,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     })
     try {
       const results = await SearchTrainer(query)
-      set({ results: results ?? [] })
+      set({
+        results: results ?? [],
+        recentSearches: [
+          query,
+          ...get().recentSearches.filter((item) => item !== query),
+        ].slice(0, 10),
+      })
     } catch (error) {
       const message = error instanceof Error ? error.message : '搜索失败，请稍后重试'
       set({ results: [], error: message })
@@ -85,6 +96,27 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ loading: { ...get().loading, detail: false } })
     }
   },
+  downloadTrainer: async (downloadURL) => {
+    set({
+      loading: { ...get().loading, download: true },
+      error: null,
+    })
+    try {
+      return await DownloadTrainer(downloadURL)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '下载失败，请稍后重试'
+      set({ error: message })
+      throw error
+    } finally {
+      set({ loading: { ...get().loading, download: false } })
+    }
+  },
   setDownloadProgress: (progress) => set({ downloadProgress: progress }),
   clearError: () => set({ error: null }),
+}), {
+  name: 'fling-trainer-browser',
+  partialize: (state) => ({
+    searchKeyword: state.searchKeyword,
+    recentSearches: state.recentSearches,
+  }),
 }))

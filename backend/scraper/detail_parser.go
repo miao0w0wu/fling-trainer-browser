@@ -26,7 +26,7 @@ type DetailParser struct {
 // NewDetailParser creates a detail parser using the same request policy as the
 // search agent.
 func NewDetailParser() *DetailParser {
-	return &DetailParser{userAgent: searchUserAgent}
+	return &DetailParser{userAgent: randomUserAgent()}
 }
 
 // Parse fetches detailURL and returns the normalized trainer metadata.
@@ -38,30 +38,18 @@ func (p *DetailParser) Parse(detailURL string) (*models.TrainerDetail, error) {
 
 	var detail *models.TrainerDetail
 	var statusCode int
-	collector := colly.NewCollector(
-		colly.UserAgent(p.userAgent),
-		colly.ParseHTTPErrorResponse(),
-	)
-	collector.SetRequestTimeout(20 * time.Second)
-	collector.Limit(&colly.LimitRule{
-		DomainGlob: "*flingtrainer.com*",
-		Delay:      500 * time.Millisecond,
-	})
-	collector.OnRequest(func(request *colly.Request) {
-		request.Headers.Set("User-Agent", p.userAgent)
-	})
-	collector.OnResponse(func(response *colly.Response) {
-		statusCode = response.StatusCode
-	})
-	collector.OnHTML("html", func(element *colly.HTMLElement) {
-		detail = parseDetail(element.DOM, element.Request.AbsoluteURL(""))
-	})
-
-	if err := collector.Visit(detailURL); err != nil {
-		if statusCode > 0 {
-			return nil, fmt.Errorf("fetch detail page (%d): %w", statusCode, err)
+	var lastErr error
+	for attempt := 0; attempt < 3; attempt++ {
+		detail, statusCode, lastErr = p.parseOnce(detailURL)
+		if lastErr == nil || !shouldRetry(statusCode, lastErr) {
+			break
 		}
-		return nil, fmt.Errorf("fetch detail page: %w", err)
+	}
+	if lastErr != nil {
+		if statusCode > 0 {
+			return nil, fmt.Errorf("fetch detail page (%d): %w", statusCode, lastErr)
+		}
+		return nil, fmt.Errorf("fetch detail page: %w", lastErr)
 	}
 	if detail == nil {
 		return nil, errors.New("detail page did not contain an HTML document")
@@ -70,6 +58,33 @@ func (p *DetailParser) Parse(detailURL string) (*models.TrainerDetail, error) {
 		return nil, errors.New("detail page did not contain a trainer title")
 	}
 	return detail, nil
+}
+
+func (p *DetailParser) parseOnce(detailURL string) (*models.TrainerDetail, int, error) {
+	var detail *models.TrainerDetail
+	statusCode := 0
+	userAgent := randomUserAgent()
+	collector := colly.NewCollector(
+		colly.UserAgent(userAgent),
+		colly.ParseHTTPErrorResponse(),
+	)
+	collector.SetRequestTimeout(20 * time.Second)
+	collector.Limit(&colly.LimitRule{
+		DomainGlob: "*flingtrainer.com*",
+		Delay:      500 * time.Millisecond,
+	})
+	collector.OnRequest(func(request *colly.Request) {
+		request.Headers.Set("User-Agent", userAgent)
+	})
+	collector.OnResponse(func(response *colly.Response) {
+		statusCode = response.StatusCode
+	})
+	collector.OnHTML("html", func(element *colly.HTMLElement) {
+		detail = parseDetail(element.DOM, element.Request.AbsoluteURL(""))
+	})
+
+	err := collector.Visit(detailURL)
+	return detail, statusCode, err
 }
 
 func parseDetail(document *goquery.Selection, sourceURL string) *models.TrainerDetail {
