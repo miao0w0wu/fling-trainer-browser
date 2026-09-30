@@ -1,5 +1,6 @@
 import { Layout, Typography } from 'antd'
 import SearchBar from './containers/SearchBar'
+import MainLayout from './containers/MainLayout'
 import './app.css'
 
 const { Header, Content } = Layout
@@ -19,12 +20,7 @@ function App() {
         </div>
       </Header>
       <Content className="app-content">
-        <div className="empty-content">
-          <Typography.Title level={4}>搜索游戏修改器</Typography.Title>
-          <Typography.Paragraph type="secondary">
-            输入游戏名称开始搜索。
-          </Typography.Paragraph>
-        </div>
+        <MainLayout />
       </Content>
     </Layout>
   )
