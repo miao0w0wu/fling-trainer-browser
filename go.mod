@@ -3,12 +3,12 @@ module changeme
 go 1.25.0
 
 require (
+	github.com/PuerkitoBio/goquery v1.13.0
 	github.com/gocolly/colly/v2 v2.3.0
 	github.com/wailsapp/wails/v3 v3.0.0-beta.26
 )
 
 require (
-	github.com/PuerkitoBio/goquery v1.13.0 // indirect
 	github.com/adrg/xdg v0.5.3 // indirect
 	github.com/andybalholm/cascadia v1.3.4 // indirect
 	github.com/antchfx/htmlquery v1.3.5 // indirect
