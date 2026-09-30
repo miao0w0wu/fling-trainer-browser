@@ -4,16 +4,24 @@ import (
 	"embed"
 	"log"
 
+	"changeme/backend/services"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 //go:embed all:frontend/dist
 var assets embed.FS
 
+func init() {
+	application.RegisterEvent[services.DownloadProgress]("download:progress")
+}
+
 func main() {
 	app := application.New(application.Options{
 		Name:        "FLiNG Trainer Browser",
 		Description: "Search and download FLiNG trainers",
+		Services: []application.Service{
+			application.NewService(services.NewTrainerService()),
+		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
 		},
