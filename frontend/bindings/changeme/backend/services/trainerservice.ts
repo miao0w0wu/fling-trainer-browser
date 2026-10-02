@@ -30,6 +30,15 @@ export function GetTrainerDetail(detailURL: string): $CancellablePromise<models$
 }
 
 /**
+ * OpenDownloadFolder opens the trainer download folder in the system file
+ * manager. When filePath points at a downloaded file, the manager opens with
+ * that file selected; an empty filePath opens the download folder itself.
+ */
+export function OpenDownloadFolder(filePath: string): $CancellablePromise<void> {
+    return $Call.ByID(2926357137, filePath);
+}
+
+/**
  * SearchTrainer searches FLiNG for trainers matching gameName.
  */
 export function SearchTrainer(gameName: string): $CancellablePromise<models$0.SearchResult[] | null> {

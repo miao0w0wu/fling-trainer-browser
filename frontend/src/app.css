@@ -134,6 +134,19 @@ body,
   margin-bottom: 24px;
 }
 
+.detail-panel .download-options-table {
+  margin-bottom: 24px;
+}
+
+.download-option-name {
+  word-break: break-all;
+  font-weight: 500;
+}
+
+.download-option-meta {
+  font-size: 12px;
+}
+
 .download-bar {
   position: fixed;
   right: 0;

@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 import {
   DownloadTrainer,
   GetTrainerDetail,
+  OpenDownloadFolder,
   SearchTrainer,
 } from '../../bindings/changeme/backend/services/trainerservice'
 import type { SearchResult, TrainerDetail } from '../types/trainer'
@@ -23,6 +24,7 @@ interface AppState {
   recentSearches: string[]
   results: SearchResult[]
   selectedDetail: TrainerDetail | null
+  lastDownloadPath: string | null
   loading: LoadingState
   downloadProgress: DownloadProgressState
   error: string | null
@@ -30,6 +32,7 @@ interface AppState {
   search: (keyword?: string) => Promise<void>
   loadDetail: (detailURL: string) => Promise<void>
   downloadTrainer: (downloadURL: string) => Promise<string>
+  openDownloadFolder: () => Promise<void>
   setDownloadProgress: (progress: DownloadProgressState) => void
   clearError: () => void
 }
@@ -39,6 +42,7 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   recentSearches: [],
   results: [],
   selectedDetail: null,
+  lastDownloadPath: null,
   loading: {
     search: false,
     detail: false,
@@ -102,13 +106,24 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
       error: null,
     })
     try {
-      return await DownloadTrainer(downloadURL)
+      const path = await DownloadTrainer(downloadURL)
+      set({ lastDownloadPath: path })
+      return path
     } catch (error) {
       const message = error instanceof Error ? error.message : '下载失败，请稍后重试'
       set({ error: message })
       throw error
     } finally {
       set({ loading: { ...get().loading, download: false } })
+    }
+  },
+  openDownloadFolder: async () => {
+    try {
+      await OpenDownloadFolder(get().lastDownloadPath ?? '')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '无法打开下载目录'
+      set({ error: message })
+      throw error
     }
   },
   setDownloadProgress: (progress) => set({ downloadProgress: progress }),

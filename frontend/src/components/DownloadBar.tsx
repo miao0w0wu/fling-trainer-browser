@@ -5,12 +5,19 @@ import { useAppStore } from '../store/appStore'
 function DownloadBar() {
   const downloading = useAppStore((state) => state.loading.download)
   const progress = useAppStore((state) => state.downloadProgress)
+  const openDownloadFolder = useAppStore((state) => state.openDownloadFolder)
 
   if (!downloading && progress.percent <= 0) {
     return null
   }
 
   const completed = !downloading && progress.percent >= 100
+
+  const handleOpenFolder = () => {
+    openDownloadFolder().catch(() => {
+      // The error is surfaced globally through the store's error handling.
+    })
+  }
 
   return (
     <div className="download-bar">
@@ -28,7 +35,7 @@ function DownloadBar() {
         />
         {completed && (
           <Space>
-            <Button icon={<FolderOpenOutlined />} size="small">
+            <Button icon={<FolderOpenOutlined />} size="small" onClick={handleOpenFolder}>
               打开下载目录
             </Button>
           </Space>

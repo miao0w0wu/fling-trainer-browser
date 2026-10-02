@@ -6,11 +6,31 @@ import {
   Image,
   List,
   Skeleton,
+  Table,
   Tag,
   Typography,
   message,
 } from 'antd'
+import type { TableColumnsType } from 'antd'
 import { useAppStore } from '../store/appStore'
+import type { DownloadOption } from '../types/trainer'
+
+const groupColors = ['purple', 'geekblue', 'cyan', 'orange']
+
+function formatDownloadCount(value: string): string {
+  if (!value || value.trim() === '') {
+    return ''
+  }
+  const count = Number(value.replace(/,/g, ''))
+  return Number.isFinite(count) ? count.toLocaleString() : value
+}
+
+function downloadOptionMeta(option: DownloadOption): string {
+  const count = formatDownloadCount(option.downloads)
+  return [option.dateAdded, option.fileSize, count ? `${count} 次下载` : '']
+    .filter(Boolean)
+    .join(' · ')
+}
 
 function DetailPanel() {
   const detail = useAppStore((state) => state.selectedDetail)
@@ -36,14 +56,60 @@ function DetailPanel() {
 
   const options = detail.options ?? []
   const images = detail.images ?? []
-  const handleDownload = async () => {
+  const downloadOptions = detail.downloadOptions ?? []
+
+  const groupToColor = new Map<string, string>()
+  downloadOptions.forEach((option) => {
+    if (option.group && !groupToColor.has(option.group)) {
+      groupToColor.set(option.group, groupColors[groupToColor.size % groupColors.length])
+    }
+  })
+  const showGroupTags = groupToColor.size > 1
+
+  const handleDownload = async (downloadURL: string) => {
     try {
-      const path = await downloadTrainer(detail.downloadUrl)
+      const path = await downloadTrainer(downloadURL)
       message.success(`下载完成：${path}`)
     } catch {
       message.error('下载失败，请稍后重试')
     }
   }
+
+  const downloadColumns: TableColumnsType<DownloadOption> = [
+    {
+      title: '文件',
+      dataIndex: 'name',
+      render: (_, option) => (
+        <div className="download-option">
+          {showGroupTags && option.group && (
+            <Tag color={groupToColor.get(option.group)} style={{ marginBottom: 4 }}>
+              {option.group}
+            </Tag>
+          )}
+          <div className="download-option-name">{option.name}</div>
+          <Typography.Text type="secondary" className="download-option-meta">
+            {downloadOptionMeta(option)}
+          </Typography.Text>
+        </div>
+      ),
+    },
+    {
+      title: '',
+      key: 'action',
+      width: 88,
+      align: 'right',
+      render: (_, option) => (
+        <Button
+          disabled={downloading || !option.url}
+          icon={<DownloadOutlined />}
+          size="small"
+          onClick={() => void handleDownload(option.url)}
+        >
+          下载
+        </Button>
+      ),
+    },
+  ]
 
   return (
     <div className="detail-panel">
@@ -98,17 +164,31 @@ function DetailPanel() {
         {detail.description || '暂无描述'}
       </Typography.Paragraph>
 
-      <Button
-        block
-        disabled={!detail.downloadUrl}
-        icon={<DownloadOutlined />}
-        loading={downloading}
-        size="large"
-        type="primary"
-        onClick={() => void handleDownload()}
-      >
-        下载修改器
-      </Button>
+      <Typography.Title level={4}>下载链接</Typography.Title>
+      {downloadOptions.length > 0 ? (
+        <Table<DownloadOption>
+          className="download-options-table"
+          size="small"
+          rowKey={(option) => option.url}
+          dataSource={downloadOptions}
+          pagination={false}
+          columns={downloadColumns}
+        />
+      ) : detail.downloadUrl ? (
+        <Button
+          block
+          disabled={!detail.downloadUrl}
+          icon={<DownloadOutlined />}
+          loading={downloading}
+          size="large"
+          type="primary"
+          onClick={() => void handleDownload(detail.downloadUrl)}
+        >
+          下载修改器
+        </Button>
+      ) : (
+        <Typography.Text type="secondary">暂无下载链接</Typography.Text>
+      )}
     </div>
   )
 }

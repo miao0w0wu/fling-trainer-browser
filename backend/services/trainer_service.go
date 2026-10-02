@@ -113,3 +113,10 @@ func (s *TrainerService) DownloadTrainer(downloadURL string) (string, error) {
 		})
 	})
 }
+
+// OpenDownloadFolder opens the trainer download folder in the system file
+// manager. When filePath points at a downloaded file, the manager opens with
+// that file selected; an empty filePath opens the download folder itself.
+func (s *TrainerService) OpenDownloadFolder(filePath string) error {
+	return s.downloadService.OpenFolder(filePath)
+}

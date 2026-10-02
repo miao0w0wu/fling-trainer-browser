@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
+	"path"
 	"regexp"
 	"strings"
 	"time"
@@ -101,7 +103,13 @@ func parseDetail(document *goquery.Selection, sourceURL string) *models.TrainerD
 	detail.LastUpdated = detailMatch(content.Text(), lastUpdatedPattern.String())
 	detail.Options = parseOptions(content)
 	detail.Images = parseImages(content, sourceURL)
-	detail.DownloadURL = parseDownloadURL(content, sourceURL)
+	detail.DownloadOptions = parseDownloadOptions(content, sourceURL)
+	for _, option := range detail.DownloadOptions {
+		if option.URL != "" {
+			detail.DownloadURL = option.URL
+			break
+		}
+	}
 	detail.Description = parseDescription(content)
 
 	if detail.Title == "" {
@@ -150,23 +158,124 @@ func parseImages(content *goquery.Selection, sourceURL string) []string {
 	return images
 }
 
-func parseDownloadURL(content *goquery.Selection, sourceURL string) string {
-	var downloadURL string
-	content.Find("a[href]").EachWithBreak(func(_ int, selection *goquery.Selection) bool {
-		href, exists := selection.Attr("href")
-		if !exists {
-			return true
+// parseDownloadOptions collects every file listed in the page's Download
+// section. On flingtrainer.com this is an attachments table where each row is
+// one file and rows without links are group headings such as
+// "Auto-Updating Version:" or "Standalone Versions:".
+func parseDownloadOptions(content *goquery.Selection, sourceURL string) []models.DownloadOption {
+	group := ""
+	var options []models.DownloadOption
+	content.Find("tr").Each(func(_ int, row *goquery.Selection) {
+		link := downloadLinkFromRow(row)
+		if link.Length() == 0 {
+			if heading := groupHeading(row); heading != "" {
+				group = heading
+			}
+			return
 		}
-		lowerHref := strings.ToLower(href)
-		if strings.HasSuffix(strings.Split(lowerHref, "?")[0], ".zip") ||
-			strings.Contains(lowerHref, "/uploads/") ||
-			strings.Contains(lowerHref, "/downloads/") {
-			downloadURL = absoluteURL(sourceURL, href)
-			return false
+		href, exists := link.Attr("href")
+		if !exists || strings.TrimSpace(href) == "" {
+			return
 		}
-		return true
+		cells := row.Find("td")
+		options = appendUniqueOption(options, models.DownloadOption{
+			Group:     group,
+			Name:      downloadName(link, href),
+			URL:       absoluteURL(sourceURL, href),
+			DateAdded: cellText(cells, "attachment-date", 1),
+			FileSize:  cellText(cells, "attachment-size", 2),
+			Downloads: cellText(cells, "attachment-downloads", 3),
+		})
 	})
-	return downloadURL
+	if len(options) == 0 {
+		return scanDownloadLinks(content, sourceURL)
+	}
+	return options
+}
+
+func downloadLinkFromRow(row *goquery.Selection) *goquery.Selection {
+	if link := row.Find("a.attachment-link").First(); link.Length() > 0 {
+		return link
+	}
+	return row.Find("a[href]").FilterFunction(func(_ int, link *goquery.Selection) bool {
+		href, exists := link.Attr("href")
+		return exists && isDownloadHref(href)
+	}).First()
+}
+
+func isDownloadHref(href string) bool {
+	lowerHref := strings.ToLower(href)
+	return strings.HasSuffix(strings.Split(lowerHref, "?")[0], ".zip") ||
+		strings.Contains(lowerHref, "/uploads/") ||
+		strings.Contains(lowerHref, "/downloads/")
+}
+
+// groupHeading returns the section title of a heading row such as
+// "Auto-Updating Version:" and "" for anything that is not one.
+func groupHeading(row *goquery.Selection) string {
+	if row.Find("a[href]").Length() > 0 {
+		return ""
+	}
+	text := cleanText(row.Text())
+	if text == "" || !strings.HasSuffix(text, ":") || len([]rune(text)) > 60 {
+		return ""
+	}
+	return strings.TrimSuffix(text, ":")
+}
+
+func downloadName(link *goquery.Selection, href string) string {
+	if title, exists := link.Attr("title"); exists && strings.TrimSpace(title) != "" {
+		return cleanText(title)
+	}
+	if name := cleanText(link.Text()); name != "" {
+		return name
+	}
+	parsed, err := url.Parse(href)
+	if err != nil {
+		return href
+	}
+	if base := path.Base(parsed.Path); base != "" && base != "/" && base != "." {
+		return base
+	}
+	return href
+}
+
+// cellText reads a row cell by its attachment class, falling back to the
+// column position used by the FLiNG table (date, size, downloads).
+func cellText(cells *goquery.Selection, class string, index int) string {
+	if cell := cells.Filter("." + class).First(); cell.Length() > 0 {
+		return cleanText(cell.Text())
+	}
+	if cells.Length() > index {
+		return cleanText(cells.Eq(index).Text())
+	}
+	return ""
+}
+
+// scanDownloadLinks is the fallback for pages without an attachments table:
+// every download-looking link becomes a plain option.
+func scanDownloadLinks(content *goquery.Selection, sourceURL string) []models.DownloadOption {
+	var options []models.DownloadOption
+	content.Find("a[href]").Each(func(_ int, link *goquery.Selection) {
+		href, exists := link.Attr("href")
+		if !exists || !isDownloadHref(href) {
+			return
+		}
+		options = appendUniqueOption(options, models.DownloadOption{
+			Name: downloadName(link, href),
+			URL:  absoluteURL(sourceURL, href),
+		})
+	})
+	return options
+}
+
+func appendUniqueOption(options []models.DownloadOption, candidate models.DownloadOption) []models.DownloadOption {
+	for _, option := range options {
+		if option.URL == candidate.URL {
+			return options
+		}
+	}
+	return append(options, candidate)
 }
 
 func parseDescription(content *goquery.Selection) string {
